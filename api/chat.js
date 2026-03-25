@@ -39,7 +39,11 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'Gemini API Key is not configured in Vercel environment variables.' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const chat = model.startChat({
       history: [
@@ -47,7 +51,8 @@ module.exports = async (req, res) => {
         { role: "model", parts: [{ text: "こんにちは！私はふくみーです。鹿児島を拠点に、AIと仕組み化で仕事をラクにするお手伝いをしています。「わたしにもできたから、あなたにもできる！」を合言葉に、初心者の方でも安心して学べる環境作りを大切にしています。具体的にどんなことでお困りですか？" }] },
       ],
       generationConfig: {
-        maxOutputTokens: 300,
+        maxOutputTokens: 400,
+        temperature: 0.7,
       },
     });
 
@@ -55,9 +60,15 @@ module.exports = async (req, res) => {
     const response = await result.response;
     const text = response.text();
 
-    return res.status(200).json({ text: text.slice(0, 300) }); // 安全のため200文字制限はプロンプトで制御
+    // 200文字以内に調整し、不自然にならないよう末尾を処理
+    let trimmedText = text.trim();
+    if (trimmedText.length > 200) {
+      trimmedText = trimmedText.slice(0, 197) + "...";
+    }
+
+    return res.status(200).json({ text: trimmedText });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Gemini API Error:', error);
+    return res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。設定（APIキー等）を確認してください。' });
   }
 };
